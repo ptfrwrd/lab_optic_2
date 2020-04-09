@@ -1,8 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.fft import fft, fftfreq, fftshift
-from mpl_toolkits.mplot3d import Axes3D
-from scipy import integrate
 
 
 M, N = 512, 100
@@ -11,11 +8,8 @@ a = 4
 calc_input_field = lambda x: np.exp(2 * 1j * (x ** 3))
 # гауссовский пучок в точке
 calc_gaussian = lambda x: np.exp(-x**2)
-
-
 # ядро преобразования
-def calc_kernel(x, u):
-    return np.exp((-2 * np.pi * 1j) * x * u)
+calc_kernel = lambda x,u: np.exp((-2 * np.pi * 1j) * x * u)
 
 
 # перестановка половин
@@ -55,23 +49,14 @@ def calc_finite_fft(values, step):
     return vect_F
 
 
-def calc_sum(temp_space, step_a):
-    temp_k, temp_series = -a, 0
-    for k in range(N):
-        temp_k += step_a
-        temp_series += step_a * calc_kernel(temp_k, temp_space) * calc_gaussian(temp_k)
-    return temp_series
-
-
 # численный расчёт интеграла
 def calc_finite_integral(step_a, x, values, u):
     kernel = calc_kernel(x, u)
     result = kernel * values
-    int_weights, int_weights[0], int_weights[-1] = np.ones(N), 0.5, 0.5
-    int_weights *= step_a
+    int_weights, int_weights[0], int_weights[-1] = np.ones(N) * step_a, 0.5 * step_a, 0.5 * step_a
     result = result * np.broadcast_to(int_weights[:, np.newaxis], (N, N))
-    ys_F = np.sum(result, axis=0)
-    return ys_F
+    result = np.sum(result, axis=0)
+    return result
 
 
 # графики для преобразования
@@ -104,20 +89,22 @@ if __name__ == '__main__':
 
     gauss_fft = calc_gaussian(x_shifted)
     input_field_fft = calc_input_field(x_shifted)
-    gauss_integ = calc_gaussian(x_shifted)
+
+    gauss_integ = calc_gaussian(old_x)
     input_field_integ = calc_input_field(old_x)
 
     integral_func = np.array(input_field_integ, dtype=np.complex)
+    fft_func = np.array(input_field_fft, dtype=np.complex)
 
     # для интегрирования
     x_for_integ = np.broadcast_to(old_x[:, np.newaxis], (N, N))
     u_for_integ = np.broadcast_to(new_x[np.newaxis, :], (N, N))
     integral_func = np.broadcast_to(integral_func[:, np.newaxis], (N, N))
 
-    fft_func = np.array(input_field_fft, dtype=np.complex)
 
     # вычисления и построение графиков
     y_fft = calc_finite_fft(fft_func, step_a)
     y_integral = calc_finite_integral(step_a, x_for_integ, integral_func, u_for_integ)
+
     create_chart(y_fft, b, 'fft-var,1d.png')
     create_chart(y_integral, b, 'integral-var,1d.png')
