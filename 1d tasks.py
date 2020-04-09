@@ -1,0 +1,123 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.fft import fft, fftfreq, fftshift
+from mpl_toolkits.mplot3d import Axes3D
+from scipy import integrate
+
+
+M, N = 512, 100
+a = 4
+# входное поле в точке
+calc_input_field = lambda x: np.exp(2 * 1j * (x ** 3))
+# гауссовский пучок в точке
+calc_gaussian = lambda x: np.exp(-x**2)
+
+
+# ядро преобразования
+def calc_kernel(x, u):
+    return np.exp((-2 * np.pi * 1j) * x * u)
+
+
+# перестановка половин
+def swap_half(values):
+    length = len(values)
+    half_length = length // 2
+    new_values = values
+    new_values = np.r_[new_values[half_length:], new_values[:half_length]]
+    return new_values
+
+
+# добавление нулей
+def add_zeros(values):
+    new_values = np.zeros(M, dtype=complex)
+    length = len(values)
+    left = (M - length) // 2
+    right = left + length
+    new_values[left:right] = values
+    return new_values
+
+
+# выбираем центральную часть массива
+def get_center(values):
+    left = (len(values) - N) // 2
+    right = left + N
+    return values[left:right]
+
+
+# БПФ
+def calc_finite_fft(values, step):
+    values = add_zeros(values)
+    values = swap_half(values)
+    fft_res = np.fft.fft(values)
+    vect_F = fft_res * step
+    vect_F = swap_half(vect_F)
+    vect_F = get_center(vect_F)
+    return vect_F
+
+
+def calc_sum(temp_space, step_a):
+    temp_k, temp_series = -a, 0
+    for k in range(N):
+        temp_k += step_a
+        temp_series += step_a * calc_kernel(temp_k, temp_space) * calc_gaussian(temp_k)
+    return temp_series
+
+
+# численный расчёт интеграла
+def calc_finite_integral(step_a, x, values, u):
+    kernel = calc_kernel(x, u)
+    result = kernel * values
+    int_weights, int_weights[0], int_weights[-1] = np.ones(N), 0.5, 0.5
+    int_weights *= step_a
+    result = result * np.broadcast_to(int_weights[:, np.newaxis], (N, N))
+    ys_F = np.sum(result, axis=0)
+    return ys_F
+
+
+# графики для преобразования
+def create_chart(values, border, name):
+    x_points = np.linspace(float(-border), float(border), len(values))
+    plt.subplot(2, 1, 1)
+    plt.plot(x_points, np.abs(values), color='red')
+    plt.title("Амплитуда", fontsize=10)
+    plt.xlabel("x", fontsize=10)
+    plt.ylabel("A", fontsize=10)
+    plt.grid(True)
+    plt.subplot(2, 1, 2)
+    pha = np.angle(values)
+    plt.plot(x_points, pha, color='blue')
+    plt.title("Фазa", fontsize=10)
+    plt.xlabel("x", fontsize=10)
+    plt.ylabel("phase", fontsize=10)
+    plt.grid(True)
+    plt.show()
+    plt.savefig(name)
+
+
+if __name__ == '__main__':
+    gauss_fft, input_field_fft, gauss_integ, input_field_integ = [], [], [], []
+    b = N ** 2 / (4 * a * M)
+    step_a = 2 * a / (N-1)
+    old_x = np.linspace(-a, a, N)
+    x_shifted = old_x - step_a / 2
+    new_x = np.linspace(-b, b, N)
+
+    gauss_fft = calc_gaussian(x_shifted)
+    input_field_fft = calc_input_field(x_shifted)
+    gauss_integ = calc_gaussian(x_shifted)
+    input_field_integ = calc_input_field(old_x)
+
+    integral_func = np.array(input_field_integ, dtype=np.complex)
+
+    # для интегрирования
+    x_for_integ = np.broadcast_to(old_x[:, np.newaxis], (N, N))
+    u_for_integ = np.broadcast_to(new_x[np.newaxis, :], (N, N))
+    integral_func = np.broadcast_to(integral_func[:, np.newaxis], (N, N))
+
+    fft_func = np.array(input_field_fft, dtype=np.complex)
+
+    # вычисления и построение графиков
+    y_fft = calc_finite_fft(fft_func, step_a)
+    y_integral = calc_finite_integral(step_a, x_for_integ, integral_func, u_for_integ)
+    create_chart(y_fft, b, 'fft-var,1d.png')
+    create_chart(y_integral, b, 'integral-var,1d.png')
