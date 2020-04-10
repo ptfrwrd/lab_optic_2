@@ -1,15 +1,28 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-
+# входные парметры
 M, N = 512, 100
 a = 4
+b = N ** 2 / (4 * a * M)
+step = 2 * a / (N - 1)
 # входное поле в точке
 calc_input_field = lambda x: np.exp(2 * 1j * (x ** 3))
 # гауссовский пучок в точке
 calc_gaussian = lambda x: np.exp(-x**2)
 # ядро преобразования
-calc_kernel = lambda x,u: np.exp((-2 * np.pi * 1j) * x * u)
+calc_kernel = lambda x, u: np.exp((-2 * np.pi * 1j) * x * u)
+
+
+"""
+ values - 2d массив дискретизированной f;
+    1. дополнение до размера M нулями слева и справа
+    2. перестановка левой и правой части массива
+    3. 2d БПФ -> вектор F 
+    4. умножить на step и возвести в квадрат(2d)
+    5. перестановка левой и правой части F
+    6. выбор центральной части F
+"""
 
 
 # перестановка половин
@@ -39,7 +52,7 @@ def get_center(values):
 
 
 # БПФ
-def calc_finite_fft(values, step):
+def calc_finite_fft(values):
     values = add_zeros(values)
     values = swap_half(values)
     fft_res = np.fft.fft(values)
@@ -49,17 +62,27 @@ def calc_finite_fft(values, step):
     return vect_F
 
 
+"""
+    Интегрирование через матричные операции
+"""
+
+
 # численный расчёт интеграла
-def calc_finite_integral(step_a, x, values, u):
+def calc_finite_integral(x, values, u):
     kernel = calc_kernel(x, u)
     result = kernel * values
-    int_weights, int_weights[0], int_weights[-1] = np.ones(N) * step_a, 0.5 * step_a, 0.5 * step_a
+    int_weights, int_weights[0], int_weights[-1] = np.ones(N) * step, 0.5 * step, 0.5 * step
     result = result * np.broadcast_to(int_weights[:, np.newaxis], (N, N))
     result = np.sum(result, axis=0)
     return result
 
 
-# графики для преобразования
+"""
+    Расчёт амплитуды (np.abs) и фазы (np.angle)
+    Построение графиков
+"""
+
+
 def create_chart(values, border, name):
     x_points = np.linspace(float(-border), float(border), len(values))
     plt.subplot(2, 1, 1)
@@ -80,31 +103,30 @@ def create_chart(values, border, name):
 
 
 if __name__ == '__main__':
-    gauss_fft, input_field_fft, gauss_integ, input_field_integ = [], [], [], []
-    b = N ** 2 / (4 * a * M)
-    step_a = 2 * a / (N-1)
+    # проверки
+    assert M >= N
+    assert M % 2 == 0
+    assert N % 2 == 0
+    # разбивка на точки
     old_x = np.linspace(-a, a, N)
-    x_shifted = old_x - step_a / 2
+    x_shifted = old_x - step / 2
     new_x = np.linspace(-b, b, N)
-
+    # подсчёт гаусса и функции из варианта для БПФ
     gauss_fft = calc_gaussian(x_shifted)
     input_field_fft = calc_input_field(x_shifted)
-
+    # подсчёт гаусса и функции из варианта для интегрирования
     gauss_integ = calc_gaussian(old_x)
     input_field_integ = calc_input_field(old_x)
-
-    integral_func = np.array(input_field_integ, dtype=np.complex)
-    fft_func = np.array(input_field_fft, dtype=np.complex)
-
-    # для интегрирования
+    # функции для интегрирования и БПФ - массивы комлексных чисел
+    integral_func = np.array(gauss_integ, dtype=np.complex)
+    fft_func = np.array(gauss_fft, dtype=np.complex)
+    # для интегрирования на матричных операциях преобразование x, u, integral_func
     x_for_integ = np.broadcast_to(old_x[:, np.newaxis], (N, N))
     u_for_integ = np.broadcast_to(new_x[np.newaxis, :], (N, N))
     integral_func = np.broadcast_to(integral_func[:, np.newaxis], (N, N))
-
-
-    # вычисления и построение графиков
-    y_fft = calc_finite_fft(fft_func, step_a)
-    y_integral = calc_finite_integral(step_a, x_for_integ, integral_func, u_for_integ)
-
-    create_chart(y_fft, b, 'fft-var,1d.png')
-    create_chart(y_integral, b, 'integral-var,1d.png')
+    # вычисления
+    y_fft = calc_finite_fft(fft_func, step)
+    y_integral = calc_finite_integral(step, x_for_integ, integral_func, u_for_integ)
+    # построение графиков
+    create_chart(y_fft, b, 'fft-gauss,1d.png')
+    create_chart(y_integral, b, 'integral-gauss,1d.png')
