@@ -125,8 +125,8 @@ if __name__ == '__main__':
     u_for_integ = np.broadcast_to(new_x[np.newaxis, :], (N, N))
     integral_func = np.broadcast_to(integral_func[:, np.newaxis], (N, N))
     # вычисления
-    y_fft = calc_finite_fft(fft_func, step)
-    y_integral = calc_finite_integral(step, x_for_integ, integral_func, u_for_integ)
+    y_fft = calc_finite_fft(fft_func)
+    y_integral = calc_finite_integral(x_for_integ, integral_func, u_for_integ)
     # построение графиков
     create_chart(y_fft, b, 'fft-gauss,1d.png')
     create_chart(y_integral, b, 'integral-gauss,1d.png')
